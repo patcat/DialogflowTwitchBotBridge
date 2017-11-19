@@ -5,26 +5,21 @@ const express = require("express"),
     bodyParser = require("body-parser"),
     request = require("request"),
     WebSocket = require('ws'),
-    google = require('googleapis'), // For auth
-    dialogflow = require('dialogflow'),
-    dialogflowSessionClient = new dialogflow.SessionsClient(),
-    dialogflowProjectID = "ed3e7584767742fa848355b1e2bef85c",
-    dialogflowSessionID = "devdiner-session-id",
-    dialogflowQuery = "Heya",
-    dialogflowLanguage = "en-US",
-    dialogflowSessionPath = dialogflowSessionClient.sessionPath(dialogflowProjectID, dialogflowSessionID);
+    dialogflow = require('apiai'),
+    dialogflowClientAccessToken = "ed3e7584767742fa848355b1e2bef85c",
+    dialogflowSessionClient = dialogflow(dialogflowClientAccessToken),
+    dialogflowSessionID = "twitchbotbridge-session-id",
+
+    // Twitch settings
+    twitchChannel = '#patcatandtech',
+    twitchBotName = 'patcatbot',
+    twitchPassword = 'oauth:wr5gz0k70j1d9bht66wpt86kd3zlas'; // Need a token? https://twitchapps.com/tmi/
 
 app.use(bodyParser.json());
 
 app.use(express.static('public'));
 
 app.set("views", __dirname + "/views");
-
-google.auth.getApplicationDefault(function(err, authClient) {
-  if (err) {
-    return console.log(err);
-  }
-});
 
 app.post("/fulfillment", function(req, resp) {
   var intent = req.body.result.metadata.intentName,
@@ -81,9 +76,9 @@ var listener = app.listen(process.env.PORT, function () {
   console.log('Your app is listening on port ' + listener.address().port);
 
   ultimateTwitchBotBridge = new ultimateTwitchBotBridge({
-      channel: '#patcatandtech',
-      username: 'patcatbot',
-      password: 'oauth:wr5gz0k70j1d9bht66wpt86kd3zlas', // Need a token? https://twitchapps.com/tmi/
+      channel: twitchChannel,
+      username: twitchBotName,
+      password: twitchPassword
   });
 
   ultimateTwitchBotBridge.open();
@@ -122,7 +117,9 @@ var ultimateTwitchBotBridge = function(options) {
 
             if (parsed !== null) {
                 console.log("Message coming in was: ", parsed);
-                this.sendDialogflow(parsed.message);
+                if (parsed.directMention.toLowerCase() == "@" + twitchBotName.toLowerCase()) {
+                  this.sendDialogflow(parsed);
+                }
             }
         }
     };
@@ -157,28 +154,47 @@ var ultimateTwitchBotBridge = function(options) {
             command: null,
             original: rawMessage,
             channel: null,
-            username: null
+            username: null,
+            directMention: null,
+            mentions: []
         };
-
-        console.log(rawMessage);
 
         if (rawMessage[0] === '@') {
             var tagIndex = rawMessage.indexOf(' '),
             userIndex = rawMessage.indexOf(' ', tagIndex + 1),
             commandIndex = rawMessage.indexOf(' ', userIndex + 1),
             channelIndex = rawMessage.indexOf(' ', commandIndex + 1),
-            messageIndex = rawMessage.indexOf(':', channelIndex + 1);
+            messageIndex = rawMessage.indexOf(':', channelIndex + 1),
+            endOfMessageIndex = rawMessage.indexOf('\r\n', messageIndex + 1);
 
             parsedMessage.tags = rawMessage.slice(0, tagIndex);
             parsedMessage.username = rawMessage.slice(tagIndex + 2, rawMessage.indexOf('!'));
             parsedMessage.command = rawMessage.slice(userIndex + 1, commandIndex);
             parsedMessage.channel = rawMessage.slice(commandIndex + 1, channelIndex);
-            parsedMessage.message = rawMessage.slice(messageIndex + 1);
+            parsedMessage.message = rawMessage.slice(messageIndex + 1, endOfMessageIndex);
+
+            // Is the message at someone?
+            if (parsedMessage.message.indexOf("@") == 0) {
+              parsedMessage.directMention = parsedMessage.message.substr(0,parsedMessage.message.indexOf(' '));
+            }
+            if (parsedMessage.message.indexOf("@") != -1) {
+              var mentions = [];
+              for (var i = 0; i < parsedMessage.message.length; i++) {
+                if (parsedMessage.message[i] === "@") {
+                  var mention = parsedMessage.message.substr(i, parsedMessage.message.indexOf(' ', i));
+                  mentions.push(mention);
+                  parsedMessage.message = parsedMessage.message.replace(mention + " ", "");
+                }
+              }
+              parsedMessage.mentions = mentions;
+            }
         }
 
         if (parsedMessage.command !== 'PRIVMSG') {
             parsedMessage = null;
         }
+
+        console.log(parsedMessage);
 
         return parsedMessage;
     };
@@ -193,43 +209,20 @@ var ultimateTwitchBotBridge = function(options) {
         }
     };
 
-    this.sendDialogflow = function(messageToSend) {
-      var request = {
-        session: dialogflowSessionPath,
-        queryInput: {
-          text: {
-            text: dialogflowQuery,
-            languageCode: dialogflowLanguage,
-          },
-        },
-      };
+    this.sendDialogflow = function(parsed) {
+      var request = dialogflowSessionClient.textRequest(parsed.message, {
+          sessionId: dialogflowSessionID
+      });
 
-      dialogflowSessionClient
-        .detectIntent(request)
-        .then(responses => {
-          console.log('Detected intent');
-          const result = responses[0].queryResult;
-          console.log('  Query: ${result.queryText}');
-          console.log('  Response: ${result.fulfillmentText}');
-          if (result.intent) {
-            console.log('  Intent: ${result.intent.displayName}');
-          } else {
-            console.log('  No intent matched.');
-          }
-        })
-        .catch(err => {
-          console.error('ERROR:', err);
-        });
+      request.on('response', function(response) {
+          console.log(response);
+          ultimateTwitchBotBridge.sendMessage("@" + parsed.username + " " + (response.result.fulfillment.speech ? response.result.fulfillment.speech : response.result.speech));
+      });
+
+      request.on('error', function(error) {
+          console.log(error);
+      });
+
+      request.end();
     };
 }
-
-
-/* This is an example of an IRC message with tags. I split it across 
-multiple lines for readability. The spaces at the beginning of each line are 
-intentional to show where each set of information is parsed. */
-
-//@badges=global_mod/1,turbo/1;color=#0D4200;display-name=TWITCH_UserNaME;emotes=25:0-4,12-16/1902:6-10;mod=0;room-id=1337;subscriber=0;turbo=1;user-id=1337;user-type=global_mod
-// :twitch_username!twitch_username@twitch_username.tmi.twitch.tv 
-// PRIVMSG 
-// #channel
-// :Kappa Keepo Kappa
