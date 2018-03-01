@@ -40,7 +40,7 @@ You can change the frequency they're run too. For things like hello and goodbye.
 
 ```
 // Twitch settings
-twitchChannel = '#meriamber',
+twitchChannel = '#devdiner',
 ```
 
 5. Add in the bot's name (needs to be an actual account you've got access to!):
@@ -90,3 +90,11 @@ npm install
 ```
 node server.js
 ```
+
+## Needing more help?
+I'm releasing an online course on Dialogflow and I'll have a guide that'll explain a lot more of the process of building a Dialogflow bot there! If you're interested, [register your interest for the Dialogflow content here](https://devdiner.com/artificial-intelligence/register-interest-virtual-assistant-course)!
+
+### Note
+This API bridge is entirely free to use with a glorious MIT license — but by downloading it, you agree to be responsible with it. With great power comes great responsibility! Go forth and build cool things! Play nice.
+
+Please check Twitch terms and conditions, along with other relevant rules and regulations, before using this Dialogflow Twitch Bot Bridge. You are responsible for anything that goes wrong while you use this, please use it with care!
