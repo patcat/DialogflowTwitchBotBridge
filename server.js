@@ -208,7 +208,7 @@ var ultimateTwitchBotBridge = function(options) {
             intent = response.result.metadata.intentName,
             contexts = response.result.contexts,
             parameters = response.result.parameters,
-            talk = 'I'm not quite sure what you mean, could you run it by me again?',
+            talk = 'I\'m not quite sure what you mean, could you run it by me again?',
             botResponse = {
                 'speech': talk,
                 'displayText': talk,
@@ -222,7 +222,7 @@ var ultimateTwitchBotBridge = function(options) {
             //console.log('Parameters were: ', parameters);
 
             if (intent == 'Default Fallback Intent' && keepQuietOnFallback) {
-                console.log('Didn't know what to say, so not saying anything at all')
+                console.log('Didn\'t know what to say, so not saying anything at all')
             } else {
                 if (direct) {
                     ultimateTwitchBotBridge.sendMessage('@' + parsed.username + ' ' + (response.result.fulfillment.speech ? response.result.fulfillment.speech : response.result.speech));
