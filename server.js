@@ -5,12 +5,13 @@ const express = require('express'),
     bodyParser = require('body-parser'),
     request = require('request'),
     WebSocket = require('ws'),
-    dialogflow = require('apiai'),
+    dialogflow = require('dialogflow'),
+    dialogflowSessionClient = new dialogflow.SessionsClient(),
     
     // Dialogflow settings
-    dialogflowClientAccessToken = 'YOURTOKENHERE',
-    dialogflowSessionClient = dialogflow(dialogflowClientAccessToken),
+    dialogflowProjectID = 'thegreatintelligencev2',
     dialogflowSessionID = 'twitchbotbridge-session-id',
+    dialogflowLanguageCode = 'en-US',
     genericIntents = [{
         intent: 'smalltalk.greetings.hello',
         freq: 0.5
@@ -28,6 +29,8 @@ const express = require('express'),
     typicalDelayBeforeResponding = 1000, // Wait a bit before seeing the message
     charactersPerMinute = 300, // How fast does the bot type?
     keepQuietOnFallback = true; // Rather than awkwardly saying it doesn't know all the time, just don't respond
+
+const dialogflowSessionPath = dialogflowSessionClient.sessionPath(dialogflowProjectID, dialogflowSessionID); // Let's get our session path
 
 app.use(bodyParser.json());
 
@@ -110,6 +113,8 @@ var ultimateTwitchBotBridge = function(options) {
             socket.send('PASS ' + this.password);
             socket.send('NICK ' + this.username);
             socket.send('JOIN ' + this.channel);
+
+            console.log('Ready to go!');
         }
     };
 
@@ -181,7 +186,10 @@ var ultimateTwitchBotBridge = function(options) {
             parsedMessage = null;
         }
 
-        console.log(parsedMessage);
+        if (parsedMessage) {
+            console.log('Parsed Message: ', parsedMessage);
+            console.log('----------------');
+        }
 
         return parsedMessage;
     };
@@ -190,7 +198,7 @@ var ultimateTwitchBotBridge = function(options) {
         var socket = this.webSocket;
 
         if (socket !== null && socket.readyState === 1) {
-            console.log('Looking to send a message.');
+            console.log('About to send a message of: ', messageToSend);
 
             setTimeout(() => {
                 socket.send('PRIVMSG ' + this.channel + ' :' + messageToSend);
@@ -199,56 +207,66 @@ var ultimateTwitchBotBridge = function(options) {
     };
 
     this.sendDialogflow = function(parsed, opts) {
-        var request = dialogflowSessionClient.textRequest(parsed.message, {
-            sessionId: dialogflowSessionID
-        }),
+        const request = {
+            session: dialogflowSessionPath,
+            queryInput: {
+                text: {
+                    text: parsed.message,
+                    languageCode: dialogflowLanguageCode
+                },
+            },
+        },
         direct = opts.direct ? opts.direct : false;
 
-        request.on('response', function(response) {
-            intent = response.result.metadata.intentName,
-            contexts = response.result.contexts,
-            parameters = response.result.parameters,
-            talk = 'I'm not quite sure what you mean, could you run it by me again?',
-            botResponse = {
-                'speech': talk,
-                'displayText': talk,
-                'source': 'agent',
-                'data': {}
-            }
-            
-            // Uncomment below if you're looking to see more of what's going on
-            //console.log('Context was: ', contexts);
-            //console.log('Intent was: ', intent);
-            //console.log('Parameters were: ', parameters);
+        dialogflowSessionClient
+            .detectIntent(request)
+            .then(responses => {
+                const result = responses[0].queryResult;
+                let intent;
 
-            if (intent == 'Default Fallback Intent' && keepQuietOnFallback) {
-                console.log('Didn't know what to say, so not saying anything at all')
-            } else {
-                if (direct) {
-                    ultimateTwitchBotBridge.sendMessage('@' + parsed.username + ' ' + (response.result.fulfillment.speech ? response.result.fulfillment.speech : response.result.speech));
+                if (result.intent) {
+                    intent = result.intent.displayName;
                 } else {
-                    console.log('Not a direct message, will check what global intents I should respond to.');
-                    var shouldRespond = false;
+                    intent = '';
+                }
 
-                    for (var i = 0; i < genericIntents.length; i++) {
-                        console.log(genericIntents[i]);
-                        if (intent == genericIntents[i].intent && Math.random() < genericIntents[i].freq) {
-                            shouldRespond = true;
+                    
+                    talk = 'I\'m not quite sure what you mean, could you run it by me again?',
+                    botResponse = {
+                        'speech': talk,
+                        'displayText': talk,
+                        'source': 'agent',
+                        'data': {}
+                    }
+
+                // Uncomment below if you're looking to see more of what's going on
+                //console.log('Intent was: ', intent);
+
+                if (intent == 'Default Fallback Intent' && keepQuietOnFallback) {
+                    console.log('Didn\'t know what to say, so not saying anything at all')
+                } else {
+                    if (direct) {
+                        ultimateTwitchBotBridge.sendMessage('@' + parsed.username + ' ' + result.fulfillmentText);
+                    } else {
+                        console.log('Not a direct message, will check what global intents I should respond to....');
+                        var shouldRespond = false;
+
+                        for (var i = 0; i < genericIntents.length; i++) {
+                            console.log('Generic intent ' + i + ': ', genericIntents[i]);
+                            if (intent == genericIntents[i].intent && Math.random() < genericIntents[i].freq) {
+                                shouldRespond = true;
+                            }
+                        }
+
+                        if (shouldRespond) {
+                            console.log('Yes, that is something I should respond to');
+                            ultimateTwitchBotBridge.sendMessage(result.fulfillmentText);
                         }
                     }
-
-                    if (shouldRespond) {
-                        console.log('Yes, that is something I should respond to');
-                        ultimateTwitchBotBridge.sendMessage((response.result.fulfillment.speech ? response.result.fulfillment.speech : response.result.speech));
-                    }
                 }
-            }
-        });
-
-        request.on('error', function(error) {
-            console.log(error);
-        });
-
-        request.end();
+            })
+            .catch(err => {
+                console.error('ERROR:', err);
+            });
     };
 }
