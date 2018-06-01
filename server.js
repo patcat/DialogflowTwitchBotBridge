@@ -24,7 +24,7 @@ const express = require('express'),
     // Twitch settings
     twitchChannel = '#devdiner',
     twitchBotName = 'DrArnoldBernard',
-    twitchPassword = 'oauth:z8megdym1abfhqvrqfyfcuxrb7ogxa', // Need a token? https://twitchapps.com/tmi/
+    twitchPassword = 'oauth:YOURTOKEN', // Need a token? https://twitchapps.com/tmi/
     genericName = 'Dr', // A name we'll replace any mentions of the username with to help with training
     typicalDelayBeforeResponding = 1000, // Wait a bit before seeing the message
     charactersPerMinute = 300, // How fast does the bot type?
