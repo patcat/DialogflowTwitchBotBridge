@@ -23,9 +23,9 @@ const express = require('express'),
 
     // Twitch settings
     twitchChannel = '#devdiner',
-    twitchBotName = 'DrArnoldBernard',
-    twitchPassword = 'oauth:YOURTOKEN', // Need a token? https://twitchapps.com/tmi/
-    genericName = 'Dr', // A name we'll replace any mentions of the username with to help with training
+    twitchBotName = 'TheGreatIntelligenceBot',
+    twitchPassword = 'oauth:youwantyourowntokenhere', // Need a token? https://twitchapps.com/tmi/
+    genericName = 'Bot', // A name we'll replace any mentions of the username with to help with training
     typicalDelayBeforeResponding = 1000, // Wait a bit before seeing the message
     charactersPerMinute = 300, // How fast does the bot type?
     keepQuietOnFallback = true; // Rather than awkwardly saying it doesn't know all the time, just don't respond
